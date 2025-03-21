@@ -1,0 +1,30 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+func wordFrequency(input string) map[string]int {
+	freq := make(map[string]int)
+
+	for _, word := range strings.Fields(input) {
+		if _, exists := freq[word]; exists {
+			freq[word]++
+		} else {
+			freq[word] = 1
+		}
+	}
+	return freq
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Enter a string:")
+	input, _ := reader.ReadString('\n')
+
+	input = strings.ToLower(strings.TrimSpace(input))
+	fmt.Println(wordFrequency(input))
+}
