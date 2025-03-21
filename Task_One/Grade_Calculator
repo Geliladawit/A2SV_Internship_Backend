@@ -1,0 +1,47 @@
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	var student_name string
+	var subject_number int
+
+	fmt.Println("Enter the student name:")
+	fmt.Scanln(&student_name)
+
+	fmt.Println("Enter the number of subjects:")
+	fmt.Scanln(&subject_number)
+
+	subjects := make([]string, subject_number)
+	grades := make([]float64, subject_number)
+
+	for i := 0; i < subject_number; i++ {
+		var subject_name string
+		var grade float64
+
+		fmt.Println("Enter the subject name:")
+		fmt.Scanln(&subject_name)
+		subjects[i] = subject_name
+
+		fmt.Println("Enter the grade:")
+		fmt.Scanln(&grade)
+		grades[i] = grade
+	}
+	ave := ave_calculator(grades, subject_number)
+
+	fmt.Println("Student name:", student_name)
+	for i := 0; i < subject_number; i++ {
+		fmt.Println("Subject:", subjects[i], "Grade:", grades[i])
+	}
+	fmt.Println("Average:", ave)
+}
+
+func ave_calculator(grades []float64, subject_number int) float64 {
+	var ave_sum float64
+	for _, g := range grades {
+		ave_sum += g
+	}
+	return ave_sum / float64(subject_number)
+}
