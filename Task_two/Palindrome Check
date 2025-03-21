@@ -1,0 +1,39 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+	"unicode"
+)
+
+func palindromeCheck(input string) bool {
+	var cleaned []rune
+
+	for _, char := range input {
+		if unicode.IsLetter(char) || unicode.IsDigit(char) {
+			cleaned = append(cleaned, unicode.ToLower(char))
+		}
+	}
+
+	for i, j := 0, len(cleaned)-1; i < j; i, j = i+1, j-1 {
+		if cleaned[i] != cleaned[j] {
+			return false
+		}
+	}
+	return true
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Enter a string:")
+	input, _ := reader.ReadString('\n')
+
+	input = strings.TrimSpace(input)
+	if palindromeCheck(input) {
+		fmt.Println("The string is a palindrome.")
+	} else {
+		fmt.Println("The string is not a palindrome.")
+	}
+}
