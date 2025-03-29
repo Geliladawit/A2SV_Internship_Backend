@@ -1,0 +1,147 @@
+import urllib.parse
+import asyncio
+import logging
+from aiogram import Bot, Dispatcher, types
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.storage.mongo import MongoStorage
+from aiogram.filters import CommandStart
+from motor.motor_asyncio import AsyncIOMotorClient
+
+
+username = "myusername"  
+password = "mypass"  
+
+encoded_username = urllib.parse.quote_plus(username)
+encoded_password = urllib.parse.quote_plus(password)
+
+MONGODB_URL = f"mongodb+srv://{encoded_username}:{encoded_password}@cluster0.jg60dvd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+BOT_TOKEN = "mytoken"
+DB_NAME = "Pizza_bot"
+COLLECTION_NAME = "orders"
+
+logging.basicConfig(level=logging.INFO)
+
+class PizzaOrder(StatesGroup):
+    size = State()
+    crust = State()
+    sauce = State()
+    toppings = State()
+    address = State()
+    confirmation = State()
+    done = State()
+
+async def main():
+    client = AsyncIOMotorClient(MONGODB_URL)
+    storage = MongoStorage(client=client, db_name=DB_NAME, collection_name=COLLECTION_NAME)
+    bot = Bot(token=BOT_TOKEN)
+    dp = Dispatcher(storage=storage)
+
+    dp.message.register(start_order, CommandStart()) 
+    dp.message.register(process_size, PizzaOrder.size)
+    dp.message.register(process_crust, PizzaOrder.crust)
+    dp.message.register(process_sauce, PizzaOrder.sauce)
+    dp.message.register(process_toppings, PizzaOrder.toppings)
+    dp.message.register(process_address, PizzaOrder.address)
+    dp.message.register(process_confirmation, PizzaOrder.confirmation)
+
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
+
+
+async def start_order(message: types.Message, state: FSMContext):
+    await state.set_state(PizzaOrder.size)
+    await message.reply("Welcome to PizzaBot!🍕 What size pizza would you like? (Small, Medium, Large)")
+
+async def process_size(message: types.Message, state: FSMContext):
+    size = message.text.lower()
+    if size not in ["small", "medium", "large"]:
+        await message.reply("Invalid size. Please choose from: Small, Medium, Large")
+        return
+
+    await state.update_data(size=size)
+    await state.set_state(PizzaOrder.crust)
+    await message.reply("What kind of crust would you like? (Thin, Thick, Stuffed)")
+
+async def process_crust(message: types.Message, state: FSMContext):
+    crust = message.text.lower()
+    if crust not in ["thin", "thick", "stuffed"]:
+        await message.reply("Invalid crust. Please choose from: Thin, Thick, Stuffed")
+        return
+
+    await state.update_data(crust=crust)
+    await state.set_state(PizzaOrder.sauce)
+    await message.reply("What kind of sauce would you like? (Tomato, Pesto, BBQ)")
+
+async def process_sauce(message: types.Message, state: FSMContext):
+    sauce = message.text.lower()
+    if sauce not in ["tomato", "pesto", "bbq"]:
+        await message.reply("Invalid sauce. Please choose from: Tomato, Pesto, BBQ")
+        return
+
+    await state.update_data(sauce=sauce)
+    await state.set_state(PizzaOrder.toppings)
+    await message.reply("What toppings would you like to add?(pepperoni, mushrooms, onions....which ever you like) (Type 'done' when finished)")
+    await state.update_data(toppings = []) 
+    return
+
+async def process_toppings(message: types.Message, state: FSMContext):
+    if message.text.lower() == "done":
+        await state.set_state(PizzaOrder.address)
+        await message.reply("What is your delivery address?🏘")
+        return
+    user_data = await state.get_data()
+    toppings = user_data.get('toppings', [])
+    topping = message.text.lower()
+    toppings.append(topping)
+
+    await state.update_data(toppings=toppings)
+    await message.reply(f"Added {topping} to your toppings. Add another topping or type 'done'.")
+
+
+async def process_address(message: types.Message, state: FSMContext):
+    address = message.text
+    await state.update_data(address=address)
+    await state.set_state(PizzaOrder.confirmation)
+
+    user_data = await state.get_data()
+    size = user_data["size"]
+    crust = user_data["crust"]
+    sauce = user_data["sauce"]
+    toppings = user_data["toppings"]
+    address = user_data["address"]
+
+    order_summary = f"""
+    Order Summary:
+    Size: {size}
+    Crust: {crust}
+    Sauce: {sauce}
+    Toppings: {", ".join(toppings)}
+    Address: {address}
+
+    Confirm order? (yes/no)
+    """
+    await message.reply(order_summary)
+
+async def process_confirmation(message: types.Message, state: FSMContext):
+    confirmation = message.text.lower()
+    if confirmation == "yes":
+        user_data = await state.get_data()
+        client = AsyncIOMotorClient(MONGODB_URL)
+        db = client[DB_NAME]
+        collection = db[COLLECTION_NAME]
+        await collection.insert_one(user_data)
+
+        await message.reply("Your order has been placed!✨ It will be delivered to your address in approximately 30 minutes.")
+    else:
+        await message.reply("Order cancelled.:(")
+
+    await state.finish() 
+    client = AsyncIOMotorClient(MONGODB_URL)
+    client.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
